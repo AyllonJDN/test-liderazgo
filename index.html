@@ -256,6 +256,19 @@ button{font:inherit;color:inherit;cursor:pointer}
   .ring .pct,.res-hero .ring .pct{font-size:46px}
   .start{padding:24px 18px}
 }
+/* ---------- Formulario de datos ---------- */
+.lead{max-width:620px;margin:0 auto;padding-block:34px 70px}
+.lead h2{font-family:var(--display);font-weight:900;font-size:clamp(28px,4.4vw,40px);letter-spacing:-.02em;margin:10px 0 8px}
+.lead .lead-sub{color:var(--muted);margin-bottom:26px}
+.field{display:block;margin-bottom:16px}
+.field>span{display:block;font-weight:700;font-size:14px;margin-bottom:6px}
+.field>span i{font-style:normal;font-weight:500;color:var(--muted)}
+.field input[type=text],.field input[type=email]{width:100%;border:2px solid var(--line);border-radius:12px;padding:14px 16px;font:inherit;background:var(--white);color:var(--ink)}
+.field input:focus{border-color:var(--pink);outline:0}
+.consent{display:flex;gap:12px;align-items:flex-start;background:var(--cream);border:2px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14px;line-height:1.5;margin:6px 0 18px;cursor:pointer}
+.consent input{flex:none;width:22px;height:22px;margin:1px 0 0;accent-color:var(--pink)}
+.lead-err{color:var(--coral);font-weight:600;font-size:14px;min-height:20px;margin-bottom:10px}
+.lead-actions{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
@@ -325,6 +338,35 @@ button{font:inherit;color:inherit;cursor:pointer}
     </div>
     <div class="blocks-preview" id="blocks-preview"></div>
     <div class="intro-cta"><button class="btn btn-grad" id="btn-start-2" type="button">Empezar el test →</button></div>
+  </div>
+</section>
+
+<!-- ================= DATOS DEL PARTICIPANTE ================= -->
+<section id="s-data" hidden>
+  <div class="band on-grad">
+    <div class="wrap">
+      <div class="brandbar">
+        <img class="iso" src="assets/isotipo-blanco.png" alt="">
+        <img class="wm" src="assets/logo-wendy-wunder-blanco.png" alt="Wendy Wünder">
+      </div>
+    </div>
+  </div>
+  <div class="wrap">
+    <form class="lead" id="lead-form" novalidate>
+      <div class="kick">Antes de empezar</div>
+      <h2>Cuéntanos quién eres</h2>
+      <p class="lead-sub">Así podremos asociar tu resultado a ti y a tu grupo.</p>
+      <label class="field"><span>Nombre y apellido</span><input type="text" id="f-nombre" autocomplete="name" maxlength="120" required></label>
+      <label class="field"><span>Correo electrónico</span><input type="email" id="f-email" autocomplete="email" maxlength="200" required></label>
+      <label class="field"><span>Empresa <i>(opcional)</i></span><input type="text" id="f-empresa" autocomplete="organization" maxlength="120"></label>
+      <label class="field"><span>Grupo o taller <i>(opcional)</i></span><input type="text" id="f-grupo" maxlength="120"></label>
+      <label class="consent"><input type="checkbox" id="f-consent"><span>Autorizo a Wendy Wünder a guardar y tratar mi nombre, correo y respuestas del test para generar mi diagnóstico y dar seguimiento a mi proceso de liderazgo. Puedo pedir que borren mis datos escribiendo a jona@wwin.pe.</span></label>
+      <div class="lead-err" id="lead-err" role="alert"></div>
+      <div class="lead-actions">
+        <button class="btn btn-grad" type="submit">Comenzar el test →</button>
+        <button class="linkbtn" id="lead-back" type="button">← Volver</button>
+      </div>
+    </form>
   </div>
 </section>
 
@@ -484,7 +526,8 @@ const TOTAL=20, KEY="ww-test-liderazgo-v1";
 const $=id=>document.getElementById(id);
 
 /* ---------- estado (guardado solo en este navegador) ---------- */
-let st={answers:Array(TOTAL).fill(null),i:0,screen:"intro",brk:0,checks:{}};
+const SB_URL="https://ofzuiootcgafdnubqhcc.supabase.co",SB_KEY="sb_publishable_JWEU3VGFVTpUuiaQjvucjA_8iiqPfcN"; // clave pública: solo permite insertar
+let st={answers:Array(TOTAL).fill(null),i:0,screen:"intro",brk:0,checks:{},lead:null,sent:false};
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&Array.isArray(s.answers)&&s.answers.length===TOTAL)st=Object.assign(st,s);}catch(e){}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
 
@@ -507,7 +550,7 @@ const profile=t=>PROFILES.find(p=>t>=p.min&&t<=p.max)||PROFILES[0];
 
 /* ---------- utilidades de UI ---------- */
 function show(name){
-  ["intro","quiz","break","result"].forEach(n=>{$("s-"+n).hidden=(n!==name);});
+  ["intro","data","quiz","break","result"].forEach(n=>{$("s-"+n).hidden=(n!==name);});
   st.screen=name;save();window.scrollTo({top:0,behavior:"auto"});
 }
 function ringSVG(p,gradId){
@@ -547,7 +590,31 @@ function start(){
   if(firstEmpty===-1){renderResult();return;}
   st.i=firstEmpty;show("quiz");renderQ();
 }
-$("btn-start").addEventListener("click",()=>{st.answers=Array(TOTAL).fill(null);st.i=0;st.checks={};show("quiz");renderQ();});
+function beginQuiz(){st.answers=Array(TOTAL).fill(null);st.i=0;st.checks={};st.sent=false;show("quiz");renderQ();}
+function openLead(){
+  const L=st.lead||{};
+  $("f-nombre").value=L.nombre||"";$("f-email").value=L.email||"";$("f-empresa").value=L.empresa||"";$("f-grupo").value=L.grupo||"";$("f-consent").checked=!!L.ok;
+  $("lead-err").textContent="";show("data");
+}
+$("btn-start").addEventListener("click",()=>{if(st.lead&&st.lead.ok)beginQuiz();else openLead();});
+$("lead-back").addEventListener("click",()=>show("intro"));
+$("lead-form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const nombre=$("f-nombre").value.trim(),email=$("f-email").value.trim(),err=$("lead-err");
+  if(!nombre){err.textContent="Escribe tu nombre.";$("f-nombre").focus();return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){err.textContent="Escribe un correo válido.";$("f-email").focus();return;}
+  if(!$("f-consent").checked){err.textContent="Necesitamos tu autorización para continuar.";return;}
+  st.lead={nombre,email,empresa:$("f-empresa").value.trim(),grupo:$("f-grupo").value.trim(),ok:true};
+  beginQuiz();
+});
+/* ---------- envío del resultado ---------- */
+function sendResult(scores,total,P,low){
+  if(st.sent||!st.lead||!st.lead.ok)return;
+  const body={nombre:st.lead.nombre,email:st.lead.email,empresa:st.lead.empresa||null,grupo:st.lead.grupo||null,consentimiento:true,
+    respuestas:st.answers,b1:scores[0],b2:scores[1],b3:scores[2],b4:scores[3],total,perfil:P.name,bloque_bajo:BLOCKS[low].name};
+  fetch(SB_URL+"/rest/v1/resultados",{method:"POST",keepalive:true,headers:{"Content-Type":"application/json",apikey:SB_KEY,Authorization:"Bearer "+SB_KEY,Prefer:"return=minimal"},body:JSON.stringify(body)})
+    .then(r=>{if(r.ok){st.sent=true;save();}}).catch(()=>{});
+}
 $("btn-start-2").addEventListener("click",()=>$("btn-start").click());
 $("btn-resume").addEventListener("click",start);
 
@@ -618,6 +685,7 @@ function renderResult(){
   const P=profile(total);
   const low=scores.indexOf(Math.min(...scores));
   show("result");
+  sendResult(scores,total,P,low);
 
   animateRing($("r-ring"),total,`${total} de 100 puntos`,null);
   $("r-profile").textContent=P.name;
@@ -658,7 +726,7 @@ let retakeArmed=false,retakeT;
 $("btn-retake").addEventListener("click",function(){
   if(!retakeArmed){retakeArmed=true;this.textContent="¿Seguro? Toca otra vez para empezar de cero";retakeT=setTimeout(()=>{retakeArmed=false;this.textContent="Repetir el test";},3500);return;}
   clearTimeout(retakeT);retakeArmed=false;this.textContent="Repetir el test";
-  st={answers:Array(TOTAL).fill(null),i:0,screen:"quiz",brk:0,checks:{}};save();show("quiz");renderQ();
+  st={answers:Array(TOTAL).fill(null),i:0,screen:"quiz",brk:0,checks:{},lead:st.lead,sent:false};save();show("quiz");renderQ();
 });
 document.querySelectorAll("[data-copy]").forEach(b=>b.addEventListener("click",()=>copyText(b.dataset.copy,"Correo copiado")));
 
@@ -668,6 +736,7 @@ const n=answered();
 if(st.screen==="result"&&n===TOTAL){renderResult();}
 else if(st.screen==="quiz"&&n<TOTAL){show("quiz");renderQ();}
 else if(st.screen==="break"){openBreak(st.brk);}
+else if(st.screen==="data"){openLead();}
 else{
   show("intro");
   if(n>0&&n<TOTAL){$("resume").hidden=false;$("resume-n").textContent=st.answers.indexOf(null)+1;}
